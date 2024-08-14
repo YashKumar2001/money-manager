@@ -4,6 +4,7 @@ const path = require('path');
 const process = require('process');
 const { authenticate } = require('@google-cloud/local-auth');
 const { google } = require('googleapis');
+const { Buffer } = require('buffer');
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -66,11 +67,21 @@ async function authorize() {
     return client;
 }
 
+function decodeBase64(base64String) {
+    // Step 1: Create a Buffer from the Base64 string
+    const buffer = Buffer.from(base64String, 'base64');
+
+    // Step 2: Convert the Buffer to a UTF-8 string
+    const utf8String = buffer.toString('utf8');
+
+    return utf8String;
+}
+
 async function parseAllMessages(message_id, data) {
     const partId = data.partId
     if (data.body.data) {
         const message = data.body.data;
-        const decoded_message = atob(message.replace(/-/g, '+').replace(/_/g, '/'));
+        const decoded_message = decodeBase64(message.replace(/-/g, '+').replace(/_/g, '/'));
         const file_path = path.join(process.cwd(), 'output', `${message_id}_${partId}.html`);
         fs.writeFile(file_path, decoded_message)
     }
@@ -85,8 +96,8 @@ async function listMails(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
     const res = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 100,
-        q: 'from:noreply@swiggy.in'
+        maxResults: 10,
+        q: 'from:alerts@hdfcbank.net '
     });
     const message_ids = res.data.messages
     message_ids.forEach(async (id_obj) => {
