@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const fsSync = require('fs')
 const path = require('path');
 const process = require('process');
 const { authenticate } = require('@google-cloud/local-auth');
@@ -65,45 +66,44 @@ async function authorize() {
     return client;
 }
 
-/**
- * Lists the labels in the user's account.
- *
- * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
- */
-// async function listLabels(auth) {
-//     const gmail = google.gmail({ version: 'v1', auth });
-//     const res = await gmail.users.labels.list({
-//         userId: 'me',
-//     });
-//     const labels = res.data.labels;
-//     if (!labels || labels.length === 0) {
-//         console.log('No labels found.');
-//         return;
-//     }
-//     console.log('Labels:');
-//     labels.forEach((label) => {
-//         console.log(`- ${label.name}`);
-//     });
-// }
+async function parseAllMessages(message_id, data) {
+    const partId = data.partId
+    if (data.body.data) {
+        const message = data.body.data;
+        const decoded_message = atob(message.replace(/-/g, '+').replace(/_/g, '/'));
+        const file_path = path.join(process.cwd(), 'output', `${message_id}_${partId}.html`);
+        fs.writeFile(file_path, decoded_message)
+    }
+    if (data.parts) {
+        data.parts.forEach((message_part) => {
+            parseAllMessages(message_id, message_part)
+        })
+    }
+}
 
-async function listLabels(auth) {
+async function listMails(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
     const res = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 1
+        maxResults: 100,
+        q: 'from:noreply@swiggy.in'
     });
     const message_ids = res.data.messages
     message_ids.forEach(async (id_obj) => {
-        console.log("id", id_obj.id);
+        const message_id = id_obj.id
+        console.log("id", message_id);
         const message_data = await gmail.users.messages.get({
             userId: 'me',
-            id: id_obj.id
+            id: message_id
         });
-        const message = message_data.data.payload.body.data;
-        const decoded_message = atob(message.replace(/-/g, '+').replace(/_/g, '/'));
-        fs.writeFile('email_data.html', decoded_message)
-        // console.log("message:", decoded_message);
+        await parseAllMessages(message_id, message_data.data.payload)
     })
 }
 
-authorize().then(listLabels).catch(console.error);
+function main() {
+    fsSync.rmSync('output', { recursive: true, force: true });
+    fsSync.mkdirSync('output');
+    authorize().then(listMails).catch(console.error);
+}
+
+main();
