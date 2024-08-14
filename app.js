@@ -5,6 +5,7 @@ const process = require('process');
 const { authenticate } = require('@google-cloud/local-auth');
 const { google } = require('googleapis');
 const { Buffer } = require('buffer');
+const { extractData } = require('./email_data_extractor')
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -82,8 +83,10 @@ async function parseAllMessages(message_id, data) {
     if (data.body.data) {
         const message = data.body.data;
         const decoded_message = decodeBase64(message.replace(/-/g, '+').replace(/_/g, '/'));
-        const file_path = path.join(process.cwd(), 'output', `${message_id}_${partId}.html`);
+        const file_path = path.join(process.cwd(), 'output', `${message_id}_${partId}.text`);
+        const file_path_html = path.join(process.cwd(), 'output', `${message_id}_${partId}.html`);
         fs.writeFile(file_path, decoded_message)
+        fs.writeFile(file_path_html, decoded_message)
     }
     if (data.parts) {
         data.parts.forEach((message_part) => {
@@ -96,19 +99,21 @@ async function listMails(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
     const res = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 10,
-        q: 'from:alerts@hdfcbank.net '
+        maxResults: 200,
+        q: 'Thank you for using your HDFC Bank Credit Card'
     });
     const message_ids = res.data.messages
-    message_ids.forEach(async (id_obj) => {
+    for (const id_obj of message_ids) {
         const message_id = id_obj.id
         console.log("id", message_id);
         const message_data = await gmail.users.messages.get({
             userId: 'me',
             id: message_id
         });
-        await parseAllMessages(message_id, message_data.data.payload)
-    })
+        parseAllMessages(message_id, message_data.data.payload)
+        console.log("file created", message_id)
+    };
+    await extractData()
 }
 
 function main() {
