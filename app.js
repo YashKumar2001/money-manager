@@ -99,8 +99,8 @@ async function listMails(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
     const res = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 200,
-        q: 'Thank you for using your HDFC Bank Credit Card'
+        maxResults: 500,
+        q: 'from:alerts@hdfcbank.net '
     });
     const message_ids = res.data.messages
     for (const id_obj of message_ids) {
@@ -111,7 +111,6 @@ async function listMails(auth) {
             id: message_id
         });
         parseAllMessages(message_id, message_data.data.payload)
-        console.log("file created", message_id)
     };
     await extractData()
 }
